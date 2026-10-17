@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>インディアンポーカー</title>
+<style>
+:root{
+  --felt:#0f5132; --felt-dark:#082e1d; --felt-light:#18744b;
+  --ink:#f6f1e3; --muted:#b5c8bb; --gold:#e8b94a; --gold-dark:#b88a22;
+  --red:#d23f3f; --card:#fffdf6; --card-ink:#1c1c1c; --line:rgba(255,255,255,.14);
+  --panel:rgba(0,0,0,.22);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;
+  color:var(--ink);
+  background:radial-gradient(ellipse at 50% 20%,var(--felt-light) 0%,var(--felt) 45%,var(--felt-dark) 100%);
+  background-attachment:fixed;
+  min-height:100vh;
+}
+button{font:inherit;cursor:pointer;border:none}
+button:disabled{opacity:.45;cursor:not-allowed}
+input{font:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:16px 16px calc(120px + env(safe-area-inset-bottom))}
+[hidden]{display:none !important}
+
+/* ---------- タイトル ---------- */
+.logo{text-align:center;margin:28px 0 22px}
+.logo .suits{font-size:22px;letter-spacing:10px;color:var(--gold)}
+.logo h1{margin:6px 0 4px;font-size:30px;letter-spacing:.08em}
+.logo p{margin:0;color:var(--muted);font-size:14px}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+.panel h2{margin:0 0 12px;font-size:16px;color:var(--gold)}
+label.field{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.text{
+  width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);
+  background:rgba(255,255,255,.95);color:#111;font-size:16px;
+}
+.row{display:flex;gap:10px}
+.row .text{flex:1;min-width:0}
+.code-input{text-transform:uppercase;letter-spacing:.3em;font-weight:700}
+
+.btn{padding:12px 18px;border-radius:10px;font-weight:700;font-size:15px;white-space:nowrap}
+.btn-gold{background:linear-gradient(180deg,#f3cb63,var(--gold-dark));color:#2a1d00;box-shadow:0 3px 0 #7d5c10}
+.btn-gold:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #7d5c10}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn-danger{background:transparent;color:#ffb3b3;border:1px solid rgba(255,120,120,.4)}
+.btn-wide{width:100%}
+.small{font-size:13px;padding:8px 12px}
+
+details.rules{font-size:14px;line-height:1.7}
+details.rules summary{cursor:pointer;color:var(--gold);font-weight:700}
+details.rules ul{margin:8px 0 0;padding-left:20px}
+
+/* ---------- ルーム ---------- */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.codechip{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 6px 6px 14px}
+.codechip .lbl{font-size:12px;color:var(--muted)}
+.codechip .code{font-weight:800;letter-spacing:.2em;font-size:18px}
+.round-label{font-weight:700;color:var(--gold)}
+
+.banner{background:rgba(210,63,63,.18);border:1px solid rgba(210,63,63,.5);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.message{text-align:center;font-size:16px;font-weight:700;margin:4px 0 14px;min-height:24px}
+.message .sub{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:4px}
+
+.table{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.seat{
+  position:relative;background:rgba(0,0,0,.18);border:1px solid var(--line);border-radius:14px;
+  padding:12px 10px;text-align:center;transition:transform .2s;
+}
+.seat.me{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.seat.winner{background:rgba(232,185,74,.18);border-color:var(--gold)}
+.seat.offline{opacity:.55}
+.seat .name{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat .tags{font-size:11px;color:var(--muted);min-height:16px}
+.seat .score{font-size:13px;color:var(--muted);margin-top:6px}
+.seat .score b{color:var(--ink);font-size:16px}
+.seat .status{margin-top:6px;font-size:13px;font-weight:700;min-height:20px}
+.status.wait{color:var(--muted)}
+.status.done{color:#9be7b4}
+.status.fight{color:var(--gold)}
+.status.fold{color:var(--muted)}
+.delta.plus{color:#9be7b4}.delta.minus{color:#ff9d9d}
+.crown{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:22px}
+.kick{position:absolute;top:6px;right:8px;background:transparent;color:var(--muted);font-size:16px;padding:2px 6px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#5fd38a;margin-right:5px;vertical-align:middle}
+.dot.off{background:#888}
+
+/* ---------- カード ---------- */
+.cardslot{display:flex;justify-content:center;margin:10px 0 2px;min-height:104px}
+.card{
+  width:72px;height:100px;border-radius:9px;position:relative;
+  box-shadow:0 4px 10px rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  animation:deal .35s ease-out;
+}
+@keyframes deal{from{transform:translateY(-14px) rotate(-6deg);opacity:0}to{transform:none;opacity:1}}
+.card.face{background:var(--card);color:var(--card-ink)}
+.card.face.red{color:var(--red)}
+.card .cr{font-size:30px;font-weight:800;line-height:1}
+.card .cs{font-size:28px;line-height:1.1}
+.card.joker{background:linear-gradient(135deg,#fff8e1,#ffe9b0);color:#6b3fa0}
+.card .jk{font-size:30px;color:var(--red)}
+.card .jt{font-size:12px;font-weight:800;letter-spacing:.1em}
+.card.back{
+  background:
+    repeating-linear-gradient(45deg,#8e1f2b 0 6px,#a8303c 6px 12px);
+  border:4px solid #fff7ea;
+}
+.card.back.q span{
+  background:rgba(255,255,255,.92);color:#8e1f2b;font-weight:900;font-size:30px;
+  width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+}
+.card.empty{background:transparent;border:2px dashed var(--line);box-shadow:none;animation:none}
+
+/* ---------- 下部の操作バー ---------- */
+.actionbar{
+  position:fixed;left:0;right:0;bottom:0;
+  background:linear-gradient(180deg,rgba(8,46,29,0),rgba(8,46,29,.96) 30%);
+  padding:22px 16px calc(14px + env(safe-area-inset-bottom));
+}
+.actionbar .inner{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.choice-row{display:flex;gap:10px}
+.choice-row .btn{flex:1;padding:16px;font-size:18px}
+.hint{text-align:center;color:var(--muted);font-size:13px}
+.host-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+
+.footer-actions{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+
+.toast{
+  position:fixed;left:50%;top:16px;transform:translateX(-50%);
+  background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;
+  box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:90vw;text-align:center;
+}
+.loading{text-align:center;color:var(--muted);margin-top:40vh}
+</style>
+</head>
+<body>
+
+<div id="screen-loading" class="loading">接続中…</div>
+
+<!-- ========== ホーム画面 ========== -->
+<div id="screen-home" class="wrap" hidden>
+  <div class="logo">
+    <div class="suits">♠♥♦♣</div>
+    <h1>インディアンポーカー</h1>
+    <p>自分のカードだけが見えない、心理戦カードゲーム</p>
+  </div>
+
+  <div class="panel">
+    <label class="field" for="name">あなたの名前</label>
+    <input id="name" class="text" maxlength="12" placeholder="例：たろう" autocomplete="off">
+  </div>
+
+  <div class="panel">
+    <h2>ルームを作る</h2>
+    <button id="btn-create" class="btn btn-gold btn-wide">新しいルームを作成</button>
+  </div>
+
+  <div class="panel">
+    <h2>ルームに参加する</h2>
+    <div class="row">
+      <input id="join-code" class="text code-input" maxlength="5" placeholder="コード5文字" autocomplete="off">
+      <button id="btn-join" class="btn btn-gold">参加</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <details class="rules">
+      <summary>ルール</summary>
+      <ul>
+        <li>参加者全員に1枚ずつカードが配られます。<b>自分のカードだけ見えません</b>（おでこに掲げているイメージ）。</li>
+        <li>他の人のカードを見て、自分が勝てそうなら「勝負」、負けそうなら「降りる」を選びます。</li>
+        <li>強さ：<b>JOKER ＞ K ＞ Q ＞ J ＞ 10 ＞ … ＞ 2 ＞ A</b>。同じ数字なら ♠ ＞ ♥ ＞ ♦ ＞ ♣。</li>
+        <li>得点：「勝負」して負けたら −2点、「降りる」は −1点。勝負した中で最も強い人が、その合計を獲得します。全員が降りた場合は点数の変動なし。</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<!-- ========== ルーム画面 ========== -->
+<div id="screen-room" class="wrap" hidden>
+  <div class="topbar">
+    <div class="codechip">
+      <span class="lbl">ルーム</span>
+      <span id="room-code" class="code"></span>
+      <button id="btn-copy" class="btn btn-gold small">招待リンクをコピー</button>
+    </div>
+    <span id="round-label" class="round-label"></span>
+  </div>
+
+  <div id="host-banner" class="banner" hidden>ホストの接続が切れています。ホストが戻るまでお待ちください。</div>
+
+  <div id="message" class="message"></div>
+  <div id="table" class="table"></div>
+
+  <div class="footer-actions">
+    <button id="btn-reset" class="btn btn-ghost small" hidden>スコアをリセット</button>
+    <button id="btn-leave" class="btn btn-danger small">退出</button>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <details class="rules">
+      <summary>ルール</summary>
+      <ul>
+        <li>自分のカードだけ見えません。他の人のカードを見て「勝負」か「降りる」を選びます。</li>
+        <li>強さ：<b>JOKER ＞ K ＞ Q ＞ J ＞ 10 ＞ … ＞ 2 ＞ A</b>。同じ数字なら ♠ ＞ ♥ ＞ ♦ ＞ ♣。</li>
+        <li>勝負して負け −2点、降りる −1点。勝者がその合計を獲得。全員降りたら変動なし。</li>
+      </ul>
+    </details>
+  </div>
+</div>
+
+<div id="actionbar" class="actionbar" hidden>
+  <div class="inner">
+    <div id="choice-row" class="choice-row" hidden>
+      <button id="btn-fold" class="btn btn-ghost">降りる</button>
+      <button id="btn-fight" class="btn btn-gold">勝負！</button>
+    </div>
+    <div id="hint" class="hint"></div>
+    <div id="host-row" class="host-row" hidden>
+      <button id="btn-start" class="btn btn-gold">ゲーム開始</button>
+      <button id="btn-force" class="btn btn-ghost small" hidden>未選択の人を「降りる」扱いにして公開</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, set, get, update, remove, onValue, onDisconnect, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+/* ================= 設定 ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBS0uw_iaV4R4xQe5lr9NDxxV4FherVqKA",
+  authDomain: "indian-poker-70cc5.firebaseapp.com",
+  databaseURL: "https://indian-poker-70cc5-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "indian-poker-70cc5",
+  storageBucket: "indian-poker-70cc5.firebasestorage.app",
+  messagingSenderId: "58573268763",
+  appId: "1:58573268763:web:5b31683a74e389694d15be"
+};
+const MAX_PLAYERS = 6;
+const MIN_PLAYERS = 2;
+const LOSE_FIGHT = -2;   // 勝負して負けたときの点数
+const LOSE_FOLD  = -1;   // 降りたときの点数
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getDatabase(app);
+
+/* ================= 状態 ================= */
+let me = null;            // 自分のID（匿名ログイン）
+let roomCode = null;      // 参加中のルームコード
+let room = null;          // ルームの公開データ
+let myViews = {};         // 自分に見える他人のカード
+let myChoice = null;      // 自分の選択
+let hostChoices = {};     // （ホストのみ）全員の選択
+let unsubs = [];
+let hostListening = false;
+let resolvingNo = null;
+
+/* ================= 小道具 ================= */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} },
+};
+let toastTimer = null;
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 3200);
+}
+function show(screen){
+  for (const id of ["screen-loading","screen-home","screen-room"]) $("#"+id).hidden = id !== screen;
+  $("#actionbar").hidden = screen !== "screen-room";
+}
+
+/* ================= カード ================= */
+const SUIT_SYM = { S:"♠", H:"♥", D:"♦", C:"♣" };
+const SUIT_RANK = { S:3, H:2, D:1, C:0 };
+const rankLabel = r => r===1 ? "A" : r===11 ? "J" : r===12 ? "Q" : r===13 ? "K" : String(r);
+const cardName = c => !c ? "?" : c.r===14 ? "JOKER" : SUIT_SYM[c.s] + rankLabel(c.r);
+const strength = c => !c ? -1 : c.r===14 ? 1000 : c.r*4 + SUIT_RANK[c.s];
+
+function makeDeck(){
+  const d = [];
+  for (const s of ["S","H","D","C"]) for (let r=1; r<=13; r++) d.push({ r, s });
+  d.push({ r:14, s:"J" });
+  return d;
+}
+function shuffle(a){
+  const rnd = new Uint32Array(a.length);
+  crypto.getRandomValues(rnd);
+  for (let i=a.length-1; i>0; i--){ const j = rnd[i] % (i+1); [a[i],a[j]] = [a[j],a[i]]; }
+  return a;
+}
+function cardHTML(c, opt = {}){
+  if (opt.empty) return `<div class="card empty"></div>`;
+  if (!c) return `<div class="card back${opt.q ? " q" : ""}">${opt.q ? "<span>？</span>" : ""}</div>`;
+  if (c.r === 14) return `<div class="card face joker"><span class="jk">★</span><span class="jt">JOKER</span></div>`;
+  const red = c.s === "H" || c.s === "D";
+  return `<div class="card face${red ? " red" : ""}"><span class="cr">${rankLabel(c.r)}</span><span class="cs">${SUIT_SYM[c.s]}</span></div>`;
+}
+
+/* ================= 名前・コード ================= */
+function getName(){
+  const n = $("#name").value.trim();
+  if (!n){ toast("名前を入力してください"); $("#name").focus(); return null; }
+  store.set("ip_name", n);
+  return n;
+}
+function genCode(){
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const rnd = new Uint32Array(5); crypto.getRandomValues(rnd);
+  return Array.from(rnd, x => chars[x % chars.length]).join("");
+}
+
+/* ================= ルーム作成・参加 ================= */
+async function createRoom(){
+  const name = getName(); if (!name) return;
+  $("#btn-create").disabled = true;
+  try {
+    for (let i=0; i<6; i++){
+      const code = genCode();
+      try {
+        await set(ref(db, `rooms/${code}`), {
+          hostUid: me,
+          createdAt: serverTimestamp(),
+          round: { no: 0, phase: "lobby" },
+          players: { [me]: { name, online: true, joinedAt: serverTimestamp() } }
+        });
+        enterRoom(code);
+        return;
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    toast("ルームを作成できませんでした。データベースのルール設定を確認してください。");
+  } finally {
+    $("#btn-create").disabled = false;
+  }
+}
+
+async function joinRoom(){
+  const name = getName(); if (!name) return;
+  const code = $("#join-code").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)){ toast("ルームコードは5文字です"); return; }
+  $("#btn-join").disabled = true;
+  try {
+    const snap = await get(ref(db, `rooms/${code}`));
+    const r = snap.val();
+    if (!r || !r.hostUid){ toast("ルームが見つかりません"); return; }
+    const already = !!r.players?.[me];
+    if (!already && Object.keys(r.players || {}).length >= MAX_PLAYERS){ toast(`このルームは満員です（最大${MAX_PLAYERS}人）`); return; }
+    await update(ref(db, `rooms/${code}/players/${me}`), {
+      name, online: true, joinedAt: already ? (r.players[me].joinedAt || Date.now()) : serverTimestamp()
+    });
+    enterRoom(code);
+  } catch (e) {
+    console.error(e); toast("参加できませんでした：" + (e.message || e));
+  } finally {
+    $("#btn-join").disabled = false;
+  }
+}
+
+function enterRoom(code){
+  stopListeners();
+  roomCode = code; room = null; myViews = {}; myChoice = null; hostChoices = {}; resolvingNo = null;
+  store.set("ip_room", code);
+  history.replaceState(null, "", location.pathname + "?room=" + code);
+  $("#room-code").textContent = code;
+  $("#message").textContent = "";
+  $("#table").innerHTML = "";
+  show("screen-room");
+
+  const onlineRef = ref(db, `rooms/${code}/players/${me}/online`);
+  unsubs.push(onValue(ref(db, ".info/connected"), s => {
+    if (s.val() === true && roomCode === code){
+      onDisconnect(onlineRef).set(false).catch(() => {});
+      set(onlineRef, true).catch(() => {});
+    }
+  }));
+  unsubs.push(onValue(ref(db, `rooms/${code}`), s => {
+    const v = s.val();
+    if (!v){ exitRoom("ルームが解散されました"); return; }
+    if (!v.players?.[me]){ exitRoom("ルームから外れました"); return; }
+    room = v;
+    if (room.hostUid === me) startHostListener();
+    render();
+    maybeResolve();
+  }, e => { console.error(e); toast("ルームを読み込めませんでした"); }));
+  unsubs.push(onValue(ref(db, `secrets/${code}/views/${me}`), s => { myViews = s.val() || {}; render(); }, () => {}));
+  unsubs.push(onValue(ref(db, `secrets/${code}/choices/${me}`), s => { myChoice = s.val(); render(); }, () => {}));
+}
+
+function startHostListener(){
+  if (hostListening) return;
+  hostListening = true;
+  const code = roomCode;
+  unsubs.push(onValue(ref(db, `secrets/${code}/choices`), s => {
+    hostChoices = s.val() || {};
+    maybeResolve();
+  }, e => console.error(e)));
+}
+
+function stopListeners(){
+  for (const u of unsubs) { try { u(); } catch {} }
+  unsubs = []; hostListening = false;
+}
+
+function exitRoom(msg){
+  if (roomCode && me) onDisconnect(ref(db, `rooms/${roomCode}/players/${me}/online`)).cancel().catch(() => {});
+  stopListeners();
+  roomCode = null; room = null;
+  store.del("ip_room");
+  history.replaceState(null, "", location.pathname);
+  show("screen-home");
+  if (msg) toast(msg);
+}
+
+async function leaveRoom(){
+  if (!room) return;
+  const code = roomCode;
+  if (room.hostUid === me){
+    if (!confirm("ホストが退出するとルームは解散されます。よろしいですか？")) return;
+    exitRoom(null);
+    try { await update(ref(db), { [`rooms/${code}`]: null, [`secrets/${code}`]: null }); }
+    catch (e) { console.error(e); }
+    toast("ルームを解散しました");
+  } else {
+    if (!confirm("ルームから退出しますか？")) return;
+    exitRoom(null);
+    try { await remove(ref(db, `rooms/${code}/players/${me}`)); } catch (e) { console.error(e); }
+    toast("退出しました");
+  }
+}
+
+/* ================= プレイヤーの操作 ================= */
+async function choose(c){
+  const r = room?.round;
+  if (!r || r.phase !== "choosing" || !(r.participants || []).includes(me)) return;
+  if (myChoice && myChoice.n === r.no) return;
+  $("#btn-fight").disabled = $("#btn-fold").disabled = true;
+  try {
+    await update(ref(db), {
+      [`secrets/${roomCode}/choices/${me}`]: { c, n: r.no },
+      [`rooms/${roomCode}/ready/${me}`]: r.no
+    });
+  } catch (e) {
+    console.error(e); toast("送信できませんでした。もう一度お試しください。");
+    $("#btn-fight").disabled = $("#btn-fold").disabled = false;
+  }
+}
+
+/* ================= ホストの操作 ================= */
+function sortedPlayers(){
+  return Object.entries(room?.players || {}).sort((a,b) => (a[1].joinedAt || 0) - (b[1].joinedAt || 0));
+}
+
+async function startRound(){
+  if (!room || room.hostUid !== me) return;
+  const online = sortedPlayers().filter(([,p]) => p.online).map(([u]) => u).slice(0, MAX_PLAYERS);
+  if (online.length < MIN_PLAYERS){ toast(`${MIN_PLAYERS}人以上が接続している必要があります`); return; }
+  const deck = shuffle(makeDeck());
+  const deal = {};
+  online.forEach((u,i) => deal[u] = deck[i]);
+  const views = {};
+  for (const v of online){
+    views[v] = {};
+    for (const t of online) if (t !== v) views[v][t] = deal[t];
+  }
+  const no = (room.round?.no || 0) + 1;
+  resolvingNo = null;
+  $("#btn-start").disabled = true;
+  try {
+    await update(ref(db), {
+      [`secrets/${roomCode}`]: { deal, views },
+      [`rooms/${roomCode}/round`]: { no, phase: "choosing", participants: online },
+      [`rooms/${roomCode}/ready`]: null
+    });
+  } catch (e) {
+    console.error(e); toast("配れませんでした：" + (e.message || e));
+  } finally {
+    $("#btn-start").disabled = false;
+  }
+}
+
+function maybeResolve(force = false){
+  if (!room || room.hostUid !== me) return;
+  const r = room.round;
+  if (!r || r.phase !== "choosing") return;
+  const parts = r.participants || [];
+  const allChosen = parts.every(u => hostChoices[u] && hostChoices[u].n === r.no);
+  if (!allChosen && !force) return;
+  if (resolvingNo === r.no) return;
+  resolvingNo = r.no;
+  resolveRound(r, parts).catch(e => { console.error(e); resolvingNo = null; toast("結果の公開に失敗しました"); });
+}
+
+async function resolveRound(r, parts){
+  const deal = (await get(ref(db, `secrets/${roomCode}/deal`))).val() || {};
+  const results = {};
+  const fighters = [];
+  for (const u of parts){
+    const ch = hostChoices[u] && hostChoices[u].n === r.no ? hostChoices[u].c : "fold";
+    results[u] = { choice: ch, delta: 0 };
+    if (ch === "fight") fighters.push(u);
+  }
+  let winner = null;
+  if (fighters.length){
+    winner = fighters.reduce((a,b) => strength(deal[b]) > strength(deal[a]) ? b : a);
+    let pot = 0;
+    for (const u of parts){
+      if (u === winner) continue;
+      const d = results[u].choice === "fight" ? LOSE_FIGHT : LOSE_FOLD;
+      results[u].delta = d; pot -= d;
+    }
+    results[winner].delta = pot;
+  }
+  const upd = {
+    "round/phase": "result",
+    "round/reveal": deal,
+    "round/results": results,
+    "round/winner": winner
+  };
+  for (const u of parts) upd[`scores/${u}`] = (room.scores?.[u] || 0) + results[u].delta;
+  await update(ref(db, `rooms/${roomCode}`), upd);
+}
+
+async function kick(uid){
+  if (!room || room.hostUid !== me || uid === me) return;
+  const name = room.players?.[uid]?.name || "このプレイヤー";
+  if (!confirm(`${name} さんをルームから外しますか？`)) return;
+  try { await update(ref(db, `rooms/${roomCode}`), { [`players/${uid}`]: null, [`scores/${uid}`]: null }); }
+  catch (e) { console.error(e); toast("外せませんでした"); }
+}
+
+async function resetScores(){
+  if (!room || room.hostUid !== me) return;
+  if (!confirm("全員のスコアを0に戻しますか？")) return;
+  try { await set(ref(db, `rooms/${roomCode}/scores`), null); } catch (e) { console.error(e); }
+}
+
+/* ================= 画面の描画 ================= */
+function render(){
+  if (!room) return;
+  const isHost = room.hostUid === me;
+  const r = room.round || { no: 0, phase: "lobby" };
+  const phase = r.phase;
+  const parts = r.participants || [];
+  const inRound = parts.includes(me);
+  const players = sortedPlayers();
+  const name = uid => room.players?.[uid]?.name || "退出した人";
+  const onlineCount = players.filter(([,p]) => p.online).length;
+
+  $("#round-label").textContent = r.no ? `第${r.no}ラウンド` : "メンバー待ち";
+  $("#host-banner").hidden = isHost || room.players?.[room.hostUid]?.online !== false;
+
+  // ---- メッセージ ----
+  let msg = "", sub = "";
+  if (phase === "lobby"){
+    msg = `${players.length}人が参加中`;
+    sub = isHost ? "全員そろったら「ゲーム開始」を押してください" : "ホストがゲームを開始するのを待っています";
+  } else if (phase === "choosing"){
+    if (!inRound){ msg = "このラウンドは観戦中です"; sub = "次のラウンドから参加できます"; }
+    else if (myChoice && myChoice.n === r.no){
+      msg = `あなたの選択：${myChoice.c === "fight" ? "勝負" : "降りる"}`;
+      const waiting = parts.filter(u => room.ready?.[u] !== r.no).length;
+      sub = waiting ? `あと${waiting}人の選択を待っています` : "結果を集計しています…";
+    } else { msg = "他の人のカードを見て、勝負するか決めよう"; sub = "あなたのカードは見えません"; }
+  } else if (phase === "result"){
+    const w = r.winner;
+    if (w){
+      const res = r.results?.[w];
+      msg = `🏆 ${esc(name(w))} さんが ${cardName(r.reveal?.[w])} で勝利！（+${res?.delta ?? 0}点）`;
+    } else {
+      msg = "全員が降りたので、点数の変動はありません";
+    }
+    if (inRound) sub = `あなたのカードは ${cardName(r.reveal?.[me])} でした`;
+  }
+  $("#message").innerHTML = (phase === "result" ? msg : esc(msg)) + (sub ? `<span class="sub">${esc(sub)}</span>` : "");
+
+  // ---- 席 ----
+  const order = phase === "lobby" ? players
+    : [...players.filter(([u]) => parts.includes(u)), ...players.filter(([u]) => !parts.includes(u))];
+  $("#table").innerHTML = order.map(([uid, p]) => {
+    const isP = parts.includes(uid);
+    const score = room.scores?.[uid] || 0;
+    let card, status = "", stCls = "wait";
+    if (phase === "result" && isP){
+      card = cardHTML(r.reveal?.[uid]);
+      const res = r.results?.[uid] || { choice: "fold", delta: 0 };
+      const d = res.delta;
+      status = `${res.choice === "fight" ? "勝負" : "降りた"} <span class="delta ${d > 0 ? "plus" : d < 0 ? "minus" : ""}">${d > 0 ? "+" + d : d}</span>`;
+      stCls = res.choice === "fight" ? "fight" : "fold";
+    } else if (phase === "choosing" && isP){
+      card = uid === me ? cardHTML(null, { q: true }) : cardHTML(myViews[uid] || null);
+      const done = room.ready?.[uid] === r.no;
+      status = done ? "選択済み" : "考え中…";
+      stCls = done ? "done" : "wait";
+    } else {
+      card = cardHTML(null, { empty: true });
+      status = phase === "lobby" ? (p.online ? "待機中" : "オフライン") : (p.online ? "観戦中" : "オフライン");
+    }
+    const tags = [uid === room.hostUid ? "ホスト" : "", uid === me ? "あなた" : ""].filter(Boolean).join("・");
+    const canKick = isHost && uid !== me && !p.online && phase !== "choosing";
+    const win = phase === "result" && r.winner === uid;
+    return `<div class="seat${uid === me ? " me" : ""}${win ? " winner" : ""}${p.online ? "" : " offline"}">
+      ${win ? '<div class="crown">👑</div>' : ""}
+      ${canKick ? `<button class="kick" data-kick="${esc(uid)}" title="外す">×</button>` : ""}
+      <div class="name"><span class="dot${p.online ? "" : " off"}"></span>${esc(p.name)}</div>
+      <div class="tags">${esc(tags)}</div>
+      <div class="cardslot">${card}</div>
+      <div class="status ${stCls}">${status}</div>
+      <div class="score">得点 <b>${score}</b></div>
+    </div>`;
+  }).join("");
+
+  // ---- 操作バー ----
+  const canChoose = phase === "choosing" && inRound && !(myChoice && myChoice.n === r.no);
+  $("#choice-row").hidden = !canChoose;
+  $("#btn-fight").disabled = $("#btn-fold").disabled = !canChoose;
+
+  $("#host-row").hidden = !isHost;
+  $("#btn-start").hidden = phase === "choosing";
+  $("#btn-start").textContent = phase === "lobby" ? "ゲーム開始" : "次のラウンド";
+  $("#btn-start").disabled = onlineCount < MIN_PLAYERS;
+  $("#btn-force").hidden = !(isHost && phase === "choosing");
+  $("#btn-reset").hidden = !(isHost && phase !== "choosing");
+  $("#btn-leave").textContent = isHost ? "ルームを解散" : "退出";
+
+  let hint = "";
+  if (isHost && phase !== "choosing" && onlineCount < MIN_PLAYERS) hint = "招待リンクを送って、友達を呼びましょう";
+  else if (!isHost && phase !== "choosing") hint = "ホストが次のラウンドを始めるのを待っています";
+  $("#hint").textContent = hint;
+}
+
+/* ================= ボタン ================= */
+$("#btn-create").onclick = createRoom;
+$("#btn-join").onclick = joinRoom;
+$("#join-code").addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(); });
+$("#btn-fight").onclick = () => choose("fight");
+$("#btn-fold").onclick = () => choose("fold");
+$("#btn-start").onclick = startRound;
+$("#btn-force").onclick = () => { if (confirm("まだ選んでいない人を「降りる」扱いにして結果を公開しますか？")) maybeResolve(true); };
+$("#btn-reset").onclick = resetScores;
+$("#btn-leave").onclick = leaveRoom;
+$("#table").addEventListener("click", e => { const b = e.target.closest("[data-kick]"); if (b) kick(b.dataset.kick); });
+$("#btn-copy").onclick = async () => {
+  const url = location.origin + location.pathname + "?room=" + roomCode;
+  try { await navigator.clipboard.writeText(url); toast("招待リンクをコピーしました"); }
+  catch { prompt("このリンクを友達に送ってください", url); }
+};
+
+/* ================= 起動 ================= */
+$("#name").value = store.get("ip_name") || "";
+const urlRoom = new URLSearchParams(location.search).get("room");
+if (urlRoom) $("#join-code").value = urlRoom.toUpperCase();
+
+let booted = false;
+onAuthStateChanged(auth, async user => {
+  if (!user || booted) return;
+  booted = true;
+  me = user.uid;
+  const last = urlRoom ? urlRoom.toUpperCase() : store.get("ip_room");
+  if (last){
+    try {
+      const r = (await get(ref(db, `rooms/${last}`))).val();
+      if (r && r.players?.[me]){ enterRoom(last); return; }
+    } catch (e) { console.warn(e); }
+    if (!urlRoom) store.del("ip_room");
+  }
+  show("screen-home");
+});
+signInAnonymously(auth).catch(e => {
+  console.error(e);
+  $("#screen-loading").textContent = "接続できませんでした。Firebaseで匿名ログインが有効になっているか確認してください。";
+});
+</script>
+</body>
+</html>
